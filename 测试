@@ -1,0 +1,210 @@
+import streamlit as st
+import random
+import time
+
+# --- 页面配置 ---
+st.set_page_config(
+    page_title="COD Universe: Life Simulator",
+    page_icon="🪖",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# --- 自定义 CSS (让界面更有 COD 战术风格) ---
+st.markdown("""
+<style>
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    .stButton>button {
+        background-color: #2E7D32; /* 战术绿 */
+        color: white;
+        border-radius: 5px;
+        border: none;
+        width: 100%;
+    }
+    .stButton>button:hover {
+        background-color: #1B5E20;
+    }
+    .log-text {
+        font-family: 'Courier New', monospace;
+        padding: 10px;
+        border-left: 2px solid #4CAF50;
+        background-color: #1e1e1e;
+        margin-bottom: 5px;
+    }
+    .highlight-141 { color: #90CAF9; font-weight: bold; } /* TF141 蓝色 */
+    .highlight-kortac { color: #FFAB91; font-weight: bold; } /* KorTac 橙色 */
+    .highlight-enemy { color: #EF5350; font-weight: bold; } /* 敌对 红色 */
+    .highlight-romance { color: #F48FB1; font-weight: bold; } /* 恋爱 粉色 */
+</style>
+""", unsafe_allow_html=True)
+
+# --- 数据 ---
+COD_CHARACTERS = {
+    "TF141": ["Captain Price", "Soap", "Ghost", "Gaz"],
+    "KorTac": ["König", "Horangi"],
+    "Chimera": ["Krueger", "Nikto", "Nikolai"],
+    "Villains": ["General Shepherd", "Makarov", "Valeria"]
+}
+
+# --- 核心逻辑函数 ---
+
+def get_relationship_desc(score):
+    if score > 80: return "【灵魂伴侣/生死之交】"
+    if score > 50: return "【亲密战友】"
+    if score > 20: return "【熟人】"
+    if score < -50: return "【死敌】"
+    if score < -20: return "【关系紧张】"
+    return "【点头之交】"
+
+def generate_life(name, gender, start_age, looks):
+    logs = []
+    relationships = {char: 0 for faction in COD_CHARACTERS.values() for char in faction}
+    is_alive = True
+    
+    logs.append(f"📁 **档案建立**: {name} | 性别: {gender}")
+    logs.append(f"👁️ **外貌特征**: {looks}")
+    logs.append("---")
+    
+    for age in range(start_age, 100):
+        if not is_alive:
+            break
+
+        # 死亡判定
+        death_base = 0.005 if age < 50 else (age - 50) * 0.002
+        if age > 80: death_base += 0.1
+        if random.random() < death_base:
+            causes = ["在一次秘密行动中光荣牺牲", "因旧伤复发在医院去世", "在睡梦中安详离世", "为了掩护队友撤离引爆了手雷"]
+            logs.append(f"💀 **{age}岁**: 你{random.choice(causes)}。")
+            is_alive = False
+            break
+        
+        # 事件生成逻辑
+        event_text = ""
+        
+        # 童年
+        if age < 18:
+            if random.random() < 0.3:
+                child_events = ["捡到一枚废弃弹壳", "在学校为了保护朋友打架", "看军事纪录片入迷"]
+                event_text = f"👶 **{age}岁**: {random.choice(child_events)}。"
+
+        # 参军
+        elif age == 18:
+            event_text = f"🪖 **{age}岁**: **你成年并参军了**。欢迎来到使命召唤的世界。"
+
+        # 服役期
+        elif 18 < age < 60:
+            # 随机互动
+            if random.random() < 0.6:
+                faction_key = random.choice(list(COD_CHARACTERS.keys()))
+                char = random.choice(COD_CHARACTERS[faction_key])
+                
+                # CSS 样式标记
+                char_span = f"<span class='highlight-141'>{char}</span>" if faction_key == "TF141" else \
+                            f"<span class='highlight-kortac'>{char}</span>" if faction_key == "KorTac" else char
+                
+                dice = random.random()
+                
+                # 谢菲尔德特殊事件
+                if char == "General Shepherd" and dice < 0.1:
+                    event_text = f"⚠️ **{age}岁**: <span class='highlight-enemy'>Shepherd</span> 让你去销毁一些文件，你觉得他在隐瞒什么。 (关系下降)"
+                    relationships[char] -= 20
+                
+                # 恋爱/暧昧 (好感度高)
+                elif dice < 0.15 and relationships[char] > 30:
+                    relationships[char] += 15
+                    romance_events = [f"在撤离机上紧握住你的手", f"在深夜为你包扎伤口", f"送了你一把定制的战术匕首"]
+                    event_text = f"❤️ **{age}岁**: {char_span} {random.choice(romance_events)}。"
+                
+                # 冲突
+                elif dice < 0.3:
+                    relationships[char] -= 10
+                    conflict_events = ["质疑你的战术", "在食堂和你吵架", "抢了你的击杀"]
+                    event_text = f"💢 **{age}岁**: 你和 {char_span} {random.choice(conflict_events)}。"
+                
+                # 友情/任务
+                else:
+                    relationships[char] += 8
+                    friend_events = ["互相掩护", "一起喝伏特加", "交换了武器配件", "把你从废墟里拉出来"]
+                    event_text = f"🤝 **{age}岁**: {char_span} {random.choice(friend_events)}。"
+
+        # 退休
+        else:
+            if random.random() < 0.3:
+                old_events = ["旧伤隐隐作痛", "Price 来看望你", "在军事学院讲课"]
+                event_text = f"☕ **{age}岁**: {random.choice(old_events)}。"
+
+        if event_text:
+            logs.append(event_text)
+
+    return logs, relationships, is_alive
+
+# --- 侧边栏：用户输入 ---
+with st.sidebar:
+    st.header("🛠️ 角色创建")
+    
+    # 随机按钮逻辑
+    if "name_input" not in st.session_state: st.session_state.name_input = ""
+    if "looks_input" not in st.session_state: st.session_state.looks_input = ""
+    
+    def randomize():
+        firsts = ["Soap", "Roach", "Frost", "Sandman", "Yuri", "Echo"]
+        lasts = ["MacTavish", "Sanderson", "Allen", "Riley"]
+        st.session_state.name_input = f"{random.choice(firsts)} {random.choice(lasts)}"
+        st.session_state.looks_input = random.choice(["左眼有疤", "总是戴面罩", "骷髅纹身", "机械义肢"])
+    
+    st.button("🎲 随机生成属性", on_click=randomize)
+
+    name = st.text_input("姓名", key="name_input")
+    gender = st.selectbox("性别", ["男", "女", "保密"])
+    age_start = st.slider("初始年龄", 1, 90, 1)
+    looks = st.text_input("外貌描述", key="looks_input")
+    
+    st.markdown("---")
+    run_btn = st.button("🚀 开始模拟人生")
+
+# --- 主界面显示 ---
+st.title("🔫 COD 世界观: 人生模拟器")
+
+if run_btn:
+    if not name: name = "Unknown Soldier"
+    if not looks: looks = "Standard Issue"
+    
+    # 运行模拟
+    with st.spinner('正在连接使命召唤指挥部数据库...'):
+        time.sleep(0.8) # 假装加载，增加仪式感
+        logs, rels, alive = generate_life(name, gender, age_start, looks)
+    
+    # 分栏显示：左边是日志，右边是最终状态
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("📜 生涯履历")
+        for log in logs:
+            # 使用 HTML 渲染来实现颜色
+            st.markdown(f"<div class='log-text'>{log}</div>", unsafe_allow_html=True)
+            time.sleep(0.05) #以此产生打字机效果
+            
+    with col2:
+        st.subheader("📊 人际关系结算")
+        sorted_rels = sorted(rels.items(), key=lambda x: x[1], reverse=True)
+        
+        # 存活状态
+        status_color = "green" if alive else "red"
+        status_text = "现役 / 退休" if alive else "阵亡 (KIA)"
+        st.markdown(f"### 状态: :{status_color}[{status_text}]")
+        
+        st.write("---")
+        for char, score in sorted_rels:
+            if score != 0:
+                # 进度条显示好感度
+                norm_score = min(max((score + 100) / 200, 0.0), 1.0) # 归一化到0-1
+                st.write(f"**{char}**: {score}")
+                st.progress(norm_score)
+                st.caption(get_relationship_desc(score))
+
+else:
+    st.info("👈 请在左侧侧边栏输入信息并点击“开始模拟人生”")
+    st.image("https://media.giphy.com/media/fX1ZTHoabK67XRqXQU/giphy.gif", caption="Task Force 141 等待你的加入")
